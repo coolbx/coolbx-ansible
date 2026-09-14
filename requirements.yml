@@ -1,3 +1,5 @@
-# Modules voor ansible-pull
+---
+# Optionele collections (de rollen zelf gebruiken alleen ansible.builtin, zodat een on-device
+# pull met enkel ansible-core werkt). community.general is handig voor lint en toekomstige rollen.
 collections:
   - name: community.general

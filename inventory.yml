@@ -1,0 +1,6 @@
+---
+# Enige host: het toestel zelf (ansible-pull en lokale runs).
+all:
+  hosts:
+    localhost:
+      ansible_connection: local

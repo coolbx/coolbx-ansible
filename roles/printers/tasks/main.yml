@@ -1,0 +1,54 @@
+---
+# cfg.printers → CUPS via lpadmin. Eenvoudig: printer toevoegen als hij ontbreekt, standaard zetten.
+# Velden: name, uri, model (default "everywhere") of ppd (pad), default (true/false).
+
+- name: Is lpadmin aanwezig?
+  ansible.builtin.stat:
+    path: /usr/sbin/lpadmin
+  register: lpadmin_bin
+
+- name: Printers overslaan
+  ansible.builtin.debug:
+    msg: "{{ 'cups/lpadmin niet geïnstalleerd' if not lpadmin_bin.stat.exists else 'geen printers in profiel' }} — overslaan"
+  when: not lpadmin_bin.stat.exists or (cfg.printers | default([]) | length == 0)
+
+- name: Printers configureren
+  when:
+    - lpadmin_bin.stat.exists
+    - cfg.printers | default([]) | length > 0
+  block:
+    - name: Lees de bestaande printers
+      ansible.builtin.command:
+        argv: [/usr/bin/lpstat, -p]
+      register: lpstat_printers
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Lees de standaardprinter
+      ansible.builtin.command:
+        argv: [/usr/bin/lpstat, -d]
+      register: lpstat_default
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Voeg ontbrekende printers toe
+      ansible.builtin.command:
+        argv: >-
+          {{ ['/usr/sbin/lpadmin', '-p', item.name, '-E', '-v', item.uri]
+             + (['-P', item.ppd] if item.ppd is defined else ['-m', item.model | default('everywhere')]) }}
+      loop: "{{ cfg.printers }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: "('printer ' ~ item.name ~ ' ') not in lpstat_printers.stdout"
+      changed_when: true
+
+    - name: Zet de standaardprinter
+      ansible.builtin.command:
+        argv: [/usr/sbin/lpadmin, -d, "{{ item.name }}"]
+      loop: "{{ cfg.printers | selectattr('default', 'defined') | selectattr('default') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: "('destination: ' ~ item.name) not in lpstat_default.stdout"
+      changed_when: true

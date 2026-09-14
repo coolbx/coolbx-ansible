@@ -1,0 +1,25 @@
+---
+# Powerwash op afstand (ADR-0034): vlag `powerwash: true` in devices.yml → marker zetten; het toestel
+# herstart alleen als er niemand is aangemeld en wist zichzelf bij de volgende opstart.
+
+- name: Is coolbx-powerwash aanwezig?
+  ansible.builtin.stat:
+    path: /usr/bin/coolbx-powerwash
+  register: powerwash_cmd
+
+- name: Is er al een powerwash aangevraagd?
+  ansible.builtin.stat:
+    path: /var/lib/coolbx/powerwash
+  register: powerwash_marker
+
+- name: Powerwash aanvragen (herstart als het toestel niet in gebruik is)
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/coolbx-powerwash
+      - request
+      - --reboot-if-idle
+  when:
+    - coolbx_device.powerwash | default(false) | bool
+    - powerwash_cmd.stat.exists
+    - not powerwash_marker.stat.exists
+  changed_when: true

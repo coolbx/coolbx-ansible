@@ -1,0 +1,71 @@
+---
+# Bepaalt WELK profiel dit toestel krijgt en laadt het (ADR-0032).
+# Volgorde: devices.yml-match (serienummer, anders hostnaam) > device.yaml-profiel (coolbx_profile)
+# > "<rol>-standaard". Resultaat: facts coolbx_device (dict of {}), coolbx_effective_profile en cfg.
+
+- name: Lees de toestellijst (devices.yml)
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir }}/devices.yml"
+    name: coolbx_devices_file
+
+- name: Zoek dit toestel op serienummer en op hostnaam
+  ansible.builtin.set_fact:
+    coolbx_match_serial: >-
+      {{ coolbx_devices_file.devices | default([])
+         | selectattr('serial', 'defined')
+         | selectattr('serial', 'equalto', coolbx_serial | string)
+         | list if (coolbx_serial | string | length > 0) else [] }}
+    coolbx_match_name: >-
+      {{ coolbx_devices_file.devices | default([])
+         | selectattr('name', 'defined')
+         | selectattr('name', 'equalto', coolbx_hostname | string)
+         | list }}
+
+- name: Kies de toestel-entry (serienummer wint van hostnaam)
+  ansible.builtin.set_fact:
+    coolbx_device: >-
+      {{ coolbx_match_serial[0] if coolbx_match_serial | length > 0
+         else (coolbx_match_name[0] if coolbx_match_name | length > 0 else {}) }}
+
+- name: Bepaal het effectieve profiel
+  ansible.builtin.set_fact:
+    coolbx_effective_profile: >-
+      {{ coolbx_device.profile if (coolbx_device.profile | default('') | string | length > 0)
+         else (coolbx_profile if (coolbx_profile | default('') | string | length > 0)
+         else coolbx_role ~ '-standaard') }}
+
+- name: Toon de identiteit van dit toestel
+  ansible.builtin.debug:
+    msg: >-
+      rol={{ coolbx_role }} kanaal={{ coolbx_channel }} serienummer={{ coolbx_serial | default('') or '-' }}
+      host={{ coolbx_hostname }} devices.yml={{ 'match: ' ~ (coolbx_device.name | default(coolbx_device.serial | default('?')))
+      if coolbx_device | length > 0 else 'geen match' }} → profiel={{ coolbx_effective_profile }}
+
+- name: Controleer of het profielbestand bestaat
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/profiles/{{ coolbx_effective_profile }}.yml"
+  register: coolbx_profile_stat
+  become: false
+
+- name: Stop met een duidelijke fout als het profiel ontbreekt
+  ansible.builtin.fail:
+    msg: >-
+      Profiel '{{ coolbx_effective_profile }}' bestaat niet: maak profiles/{{ coolbx_effective_profile }}.yml
+      aan, of pas devices.yml / /etc/coolbx/device.yaml aan.
+  when: not coolbx_profile_stat.stat.exists
+
+- name: Laad de gedeelde basis (profiles/basis.yml)
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir }}/profiles/basis.yml"
+    name: coolbx_basis_vars
+
+- name: Laad het profiel {{ coolbx_effective_profile }}
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir }}/profiles/{{ coolbx_effective_profile }}.yml"
+    name: coolbx_profile_vars
+
+- name: Combineer basis + profiel tot cfg (dicts recursief, lijsten aangevuld)
+  ansible.builtin.set_fact:
+    cfg: >-
+      {{ (coolbx_basis_vars | default({}, true))
+         | combine(coolbx_profile_vars | default({}, true), recursive=True, list_merge='append') }}

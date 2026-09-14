@@ -1,0 +1,4 @@
+# Managed by coolbx-ansible (profile {{ coolbx_effective_profile }}) — do not edit by hand.
+{% for lock in cfg.dconf_locks | default([]) %}
+{{ lock if lock.startswith('/') else '/' ~ lock }}
+{% endfor %}

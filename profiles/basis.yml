@@ -1,0 +1,47 @@
+---
+# Gedeelde basis voor ALLE profielen. Een profiel (profiles/<naam>.yml) wordt hier bovenop gelegd:
+# dicts worden recursief samengevoegd, lijsten worden AANGEVULD (append).
+# Sandbox-waarden (Google Workspace OU /coolbx-sandbox).
+
+# Kiosk-apps (ADR-0029): elke app → /etc/coolbx/kiosk-apps.d/<id>.yaml.
+# id = a-z0-9-, name, url; optioneel icon, allow_domains (alleen deze hosts bereikbaar), policy.
+kiosk_apps:
+  - id: smartschool
+    name: Smartschool
+    url: https://edugolo.smartschool.be/
+    icon: coolbx-kiosk
+    allow_domains:
+      - edugolo.smartschool.be
+      - smartschool.be
+  - id: bingel
+    name: Bingel
+    url: https://www.bingel.be/
+    icon: coolbx-kiosk
+    allow_domains:
+      - bingel.be
+
+# Chrome/Chromium-beleid van het toestel → /etc/chromium/policies/managed/coolbx-profile.json
+# (gedeeld met Google Chrome via symlink, ADR-0033). Inhoudelijk beleid per gebruiker komt uit de
+# Google Admin-console; hier alleen de toestelkant.
+chrome_policies:
+  HomepageLocation: https://edugolo.smartschool.be/
+  RestoreOnStartup: 4
+  RestoreOnStartupURLs:
+    - https://edugolo.smartschool.be/
+  BrowserSignin: 1
+  PasswordManagerEnabled: false
+
+# dconf-systeeminstellingen → /etc/dconf/db/local.d/50-coolbx-profile.
+# Waarden zijn GVariant-tekst: 'tekst' met enkele quotes, true/false, getallen, ['lijst'].
+dconf:
+  org/gnome/desktop/interface:
+    clock-show-weekday: "true"
+
+# dconf-paden die de gebruiker NIET mag wijzigen (bv. /org/gnome/desktop/screensaver/lock-enabled).
+dconf_locks: []
+
+# System-flatpaks uit Flathub (app-id's). Worden geïnstalleerd, nooit verwijderd.
+flatpaks: []
+
+# Printers via CUPS: - {name, uri, model (default: everywhere) of ppd, default: true/false}
+printers: []

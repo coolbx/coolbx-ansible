@@ -1,0 +1,9 @@
+---
+- name: Dconf update
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/dconf
+      - update
+  changed_when: true
+  when: dconf_bin.stat.exists
+  listen: Dconf update

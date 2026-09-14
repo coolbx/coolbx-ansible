@@ -1,0 +1,8 @@
+# Managed by coolbx-ansible (profile {{ coolbx_effective_profile }}) — do not edit by hand.
+{% for path, keys in (cfg.dconf | default({})).items() %}
+[{{ path | regex_replace('^/', '') }}]
+{% for key, value in (keys | default({})).items() %}
+{{ key }}={{ value }}
+{% endfor %}
+
+{% endfor %}

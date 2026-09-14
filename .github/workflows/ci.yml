@@ -1,0 +1,54 @@
+---
+# CI voor de config-repo: lint + syntax-check + dry-run in check-modus (zonder echte vault).
+name: ci
+
+on:
+  push:
+    branches: [main, testing]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Installeer ansible, yamllint en ansible-lint
+        run: pip install --quiet ansible-core yamllint ansible-lint
+
+      - name: Installeer collections
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: yamllint
+        run: yamllint --strict .
+
+      - name: ansible-lint
+        run: ansible-lint
+
+      - name: Syntax-check
+        run: >
+          ansible-playbook --syntax-check local.yml
+          -e coolbx_role=leerling -e coolbx_profile= -e coolbx_channel=stabiel
+          -e coolbx_serial= -e coolbx_hostname=coolbx-dev
+
+      - name: Dry-run (check-modus) per rol, met placeholder-vault
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          echo "ci-placeholder" > "$tmp/pass"
+          cp vault.example.yml "$tmp/vault.yml"
+          # De echte vault.yml is in CI niet te ontcijferen; test met het plaintext-sjabloon.
+          rm -f vault.yml && ansible-vault encrypt --vault-password-file "$tmp/pass" --output vault.yml "$tmp/vault.yml"
+          for role in leerling leerkracht gedeeld; do
+            ansible-playbook local.yml --check --diff --vault-password-file "$tmp/pass" \
+              -e coolbx_role="$role" -e coolbx_profile= -e coolbx_channel=stabiel \
+              -e coolbx_serial= -e coolbx_hostname=ci-runner
+          done
+          git checkout -- vault.yml 2>/dev/null || rm -f vault.yml

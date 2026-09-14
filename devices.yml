@@ -1,0 +1,27 @@
+---
+# Coolbx OS — platte toestellijst (ADR-0032).
+#
+# Eén entry per toestel. Het toestel zoekt zichzelf op:
+#   1. op `serial`  = BIOS-serienummer (/sys/class/dmi/id/product_serial)
+#   2. anders op `name` = hostnaam (korte vorm) — handig voor VM's zonder bruikbaar serienummer
+# Geen match? Dan geldt het profiel uit /etc/coolbx/device.yaml, of anders "<rol>-standaard".
+#
+# Velden:
+#   serial     BIOS-serienummer (string, exact zoals het toestel het meldt; mag ontbreken)
+#   name       leesbare naam / hostnaam (fallback-match)
+#   profile    naam van profiles/<profile>.yml
+#   channel    stabiel | test  — informatief; het toestel kiest zijn branch zelf uit device.yaml
+#   powerwash  true → het toestel wist zichzelf bij de volgende idle-herstart (ADR-0034).
+#              Zet dit daarna terug op false, anders wist het toestel zich na herinschrijving opnieuw.
+devices:
+  - serial: "VOORBEELD-SERIENUMMER"
+    name: laptop-01
+    profile: leerling-standaard
+    channel: stabiel
+    powerwash: false
+
+  # Dev-VM (geen bruikbaar BIOS-serienummer → match op hostnaam).
+  - name: coolbx-dev
+    profile: leerling-standaard
+    channel: test
+    powerwash: false

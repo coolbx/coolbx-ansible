@@ -1,38 +1,58 @@
-# Hoofd playbook voor (router)
-- name: Hoofd-playbook voor alle laptops
+---
+# Coolbx OS — toestelconfig (config-repo v3, ADR-0032).
+# Wordt op het toestel gedraaid door /usr/libexec/coolbx-ansible-pull (ansible-pull) met deze
+# extra-vars: coolbx_role, coolbx_profile, coolbx_channel, coolbx_serial, coolbx_hostname.
+# De defaults hieronder maken een losse `ansible-playbook local.yml --check` op een dev-machine mogelijk.
+- name: Coolbx OS toestelconfig
   hosts: localhost
   connection: local
-  gather_facts: false
+  become: true
+  gather_facts: true
+  gather_subset:
+    - "!all"
+    - "!min"
+    - platform
+  vars:
+    # Veilige defaults; het toestel overschrijft ze via -e (extra-vars winnen altijd).
+    coolbx_role: onbekend
+    coolbx_profile: ""
+    coolbx_channel: stabiel
+    coolbx_serial: ""
+    coolbx_hostname: "{{ ansible_facts['hostname'] | default('localhost') }}"
 
   pre_tasks:
-    # 1. Lees het /etc/laptop-group bestand
-    - name: Bepaal de laptopgroep
-      # ansible.builtin.command: cat /etc/ansible/laptop-group
-      ansible.builtin.shell: cat /usr/share/ansible/laptop-group 2>/dev/null
-      register: group_file_content
-      changed_when: false
-      failed_when: false # Faal niet als het bestand niet bestaat
-      check_mode: false
+    - name: Bepaal of vault.yml bestaat
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/vault.yml"
+      register: coolbx_vault_stat
+      become: false
 
-    # 2. Sla de inhoud op in een variabele (e.g., "leerlingen")
-    - name: Zet de 'laptop_group' variabele
-      ansible.builtin.set_fact:
-        laptop_group: "{{ group_file_content.stdout | trim | default('geen_groep') }}"
+    # Zonder vault-wachtwoord (bv. dev-machine) mislukt het ontcijferen; dat is oké: rollen die
+    # geheimen nodig hebben slaan dan over. Op het toestel geeft coolbx-ansible-pull het wachtwoord mee.
+    - name: Laad geheimen uit vault.yml (indien ontcijferbaar)
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/vault.yml"
+      when: coolbx_vault_stat.stat.exists
+      register: coolbx_vault_load
+      failed_when: false
+      no_log: true
 
-  tasks:
-    # 3. Importeer ALTIJD de 'common' taken
-    - name: Voer common taken uit
-      ansible.builtin.include_tasks: playbooks/common.yml
+    - name: Melding wanneer de vault niet geladen kon worden
+      ansible.builtin.debug:
+        msg: >-
+          vault.yml kon niet geladen worden (geen of verkeerd vault-wachtwoord?) —
+          rollen die geheimen nodig hebben (chrome-token, google-login, admin-user) slaan over.
+      when:
+        - coolbx_vault_stat.stat.exists
+        - coolbx_vault_load.ansible_included_var_files | default([]) | length == 0
 
-    # 4. Importeer de specifieke taken op basis van de variabele
-    - name: Voer leerlingen taken uit
-      ansible.builtin.include_tasks: playbooks/lln.yml
-      when: laptop_group == 'leerlingen'
-
-    - name: Voer leerkrachten taken uit
-      ansible.builtin.include_tasks: playbooks/lkn.yml
-      when: laptop_group == 'leerkrachten'
-
-    - name: Voer administratie taken uit
-      ansible.builtin.include_tasks: playbooks/admin.yml
-      when: laptop_group == 'administratie'
+  roles:
+    - role: device-identity
+    - role: kiosk-apps
+    - role: dconf
+    - role: chrome
+    - role: google-login
+    - role: flatpaks
+    - role: printers
+    - role: admin-user
+    - role: powerwash

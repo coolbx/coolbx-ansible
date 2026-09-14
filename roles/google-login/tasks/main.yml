@@ -1,0 +1,106 @@
+---
+# Google Secure LDAP via SSSD (ADR-0031). Alleen als het profiel `google_login` definieert.
+# Config (0644) uit het profiel; toegangsgegevens + cert/sleutel (0600) uit de vault; daarna
+# /usr/libexec/coolbx-google-login-apply (genereert sssd.conf en herstart sssd).
+
+- name: Google-login overslaan (profiel definieert geen google_login)
+  ansible.builtin.debug:
+    msg: "geen google_login in profiel {{ coolbx_effective_profile }} — overslaan"
+  when: cfg.google_login is not defined
+
+- name: Google-login configureren
+  when: cfg.google_login is defined
+  block:
+    - name: Controleer de google_login-instellingen
+      ansible.builtin.assert:
+        that:
+          - cfg.google_login.search_bases | default([]) | length > 0
+          - cfg.google_login.group_base | default('') | length > 0
+          - cfg.google_login.allow_groups | default([]) | length > 0
+        fail_msg: "google_login: search_bases, group_base en allow_groups zijn verplicht"
+        quiet: true
+
+    - name: Map voor google-login-config
+      ansible.builtin.file:
+        path: /etc/coolbx/google-login
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Schrijf config.yaml (domein, zoekbases, groepen)
+      ansible.builtin.copy:
+        dest: /etc/coolbx/google-login/config.yaml
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # Managed by coolbx-ansible (profile {{ coolbx_effective_profile }}) — do not edit by hand.
+          {{ {'domain': cfg.google_login.domain | default(''),
+              'search_bases': cfg.google_login.search_bases,
+              'group_base': cfg.google_login.group_base,
+              'allow_groups': cfg.google_login.allow_groups} | to_nice_yaml(indent=2) }}
+      register: google_login_cfg
+
+    - name: Geheimen ontbreken (vault niet geladen) — sssd wordt niet geactiveerd
+      ansible.builtin.debug:
+        msg: >-
+          google_ldap_user/password/cert/key niet gedefinieerd — draai met het vault-wachtwoord
+          om Google-login te activeren.
+      when: >-
+        google_ldap_user is not defined or google_ldap_password is not defined
+        or google_ldap_cert is not defined or google_ldap_key is not defined
+
+    - name: Geheimen plaatsen en toepassen
+      when:
+        - google_ldap_user is defined
+        - google_ldap_password is defined
+        - google_ldap_cert is defined
+        - google_ldap_key is defined
+      block:
+        - name: Schrijf de LDAP-toegangsgegevens (regel 1 gebruiker, regel 2 wachtwoord)
+          ansible.builtin.copy:
+            dest: /etc/coolbx/google-login/access
+            content: "{{ google_ldap_user | trim }}\n{{ google_ldap_password | trim }}\n"
+            owner: root
+            group: root
+            mode: "0600"
+          no_log: true
+          register: google_login_access
+
+        - name: Map /etc/sssd
+          ansible.builtin.file:
+            path: /etc/sssd
+            state: directory
+            owner: root
+            group: root
+            mode: "0700"
+
+        - name: Schrijf het LDAP-clientcertificaat en de sleutel
+          ansible.builtin.copy:
+            dest: "{{ item.dest }}"
+            content: "{{ item.content | trim }}\n"
+            owner: root
+            group: root
+            mode: "0600"
+          loop:
+            - {dest: /etc/sssd/coolbx-ldap.crt, content: "{{ google_ldap_cert }}"}
+            - {dest: /etc/sssd/coolbx-ldap.key, content: "{{ google_ldap_key }}"}
+          loop_control:
+            label: "{{ item.dest }}"
+          no_log: true
+          register: google_login_tls
+
+        - name: Is coolbx-google-login-apply aanwezig?
+          ansible.builtin.stat:
+            path: /usr/libexec/coolbx-google-login-apply
+          register: google_login_apply_cmd
+
+        - name: SSSD-config genereren en toepassen (coolbx-google-login-apply)
+          ansible.builtin.command:
+            argv:
+              - /usr/libexec/coolbx-google-login-apply
+          when:
+            - google_login_apply_cmd.stat.exists
+            - google_login_cfg is changed or google_login_access is changed or google_login_tls is changed
+          changed_when: true

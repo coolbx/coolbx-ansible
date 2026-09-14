@@ -1,0 +1,5 @@
+---
+# Standaardprofiel voor gedeelde toestellen (rol "gedeeld"): lokale wachtwoordloze gebruiker,
+# GEEN Google-login (ADR-0031). Ligt bovenop profiles/basis.yml.
+
+flatpaks: []

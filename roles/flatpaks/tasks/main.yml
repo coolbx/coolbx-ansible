@@ -1,0 +1,57 @@
+---
+# cfg.flatpaks (app-id's) → system-flatpaks uit Flathub. Installeert alleen wat ontbreekt; verwijdert nooit.
+
+- name: Is flatpak aanwezig?
+  ansible.builtin.stat:
+    path: /usr/bin/flatpak
+  register: flatpak_bin
+
+- name: Flatpaks overslaan
+  ansible.builtin.debug:
+    msg: "{{ 'flatpak niet geïnstalleerd' if not flatpak_bin.stat.exists else 'geen flatpaks in profiel' }} — overslaan"
+  when: not flatpak_bin.stat.exists or (cfg.flatpaks | default([]) | length == 0)
+
+- name: Flatpaks installeren
+  when:
+    - flatpak_bin.stat.exists
+    - cfg.flatpaks | default([]) | length > 0
+  block:
+    - name: Lees de system-remotes
+      ansible.builtin.command:
+        argv: [/usr/bin/flatpak, remotes, --system, --columns=name]
+      register: flatpak_remotes
+      changed_when: false
+      check_mode: false
+
+    - name: Zorg dat Flathub als system-remote bestaat
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/flatpak
+          - remote-add
+          - --system
+          - --if-not-exists
+          - flathub
+          - https://dl.flathub.org/repo/flathub.flatpakrepo
+      when: "'flathub' not in flatpak_remotes.stdout_lines | map('trim') | list"
+      changed_when: true
+
+    - name: Lees de geïnstalleerde system-apps
+      ansible.builtin.command:
+        argv: [/usr/bin/flatpak, list, --system, --app, --columns=application]
+      register: flatpak_installed
+      changed_when: false
+      check_mode: false
+
+    - name: Installeer ontbrekende flatpaks
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/flatpak
+          - install
+          - --system
+          - --noninteractive
+          - -y
+          - flathub
+          - "{{ item }}"
+      loop: "{{ cfg.flatpaks }}"
+      when: item not in (flatpak_installed.stdout_lines | map('trim') | list)
+      changed_when: true

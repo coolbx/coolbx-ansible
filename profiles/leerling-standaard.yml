@@ -1,0 +1,16 @@
+---
+# Standaardprofiel voor leerling-toestellen (rol "leerling"). Ligt bovenop profiles/basis.yml.
+
+# Aanmelden met het school-Google-account (ADR-0031). Secundaire domeinen zijn aparte subbomen,
+# daarom meerdere search_bases. allow_groups = Google-groepen die op dit toestel mogen aanmelden.
+google_login:
+  domain: lln.edugolo.be
+  search_bases:
+    - dc=lln,dc=edugolo,dc=be
+    - dc=edugolo,dc=be
+  group_base: ou=Groups,dc=edugolo,dc=be
+  allow_groups:
+    - coolbx-test-leerlingen
+    - coolbx-test-ict
+
+flatpaks: []

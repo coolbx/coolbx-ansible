@@ -1,0 +1,53 @@
+---
+# cfg.dconf → /etc/dconf/db/local.d/50-coolbx-profile ; cfg.dconf_locks → .../locks/50-coolbx-profile.
+# Het image levert /etc/dconf/profile/user met system-db:local; wij vullen alleen aan.
+
+- name: Is dconf aanwezig?
+  ansible.builtin.stat:
+    path: /usr/bin/dconf
+  register: dconf_bin
+
+- name: Mappen voor dconf-systeemdatabase
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/dconf/db/local.d
+    - /etc/dconf/db/local.d/locks
+
+- name: Schrijf dconf-instellingen van het profiel
+  ansible.builtin.template:
+    src: settings.j2
+    dest: /etc/dconf/db/local.d/50-coolbx-profile
+    owner: root
+    group: root
+    mode: "0644"
+  when: cfg.dconf | default({}) | length > 0
+  notify: Dconf update
+
+- name: Verwijder dconf-instellingen als het profiel er geen heeft
+  ansible.builtin.file:
+    path: /etc/dconf/db/local.d/50-coolbx-profile
+    state: absent
+  when: cfg.dconf | default({}) | length == 0
+  notify: Dconf update
+
+- name: Schrijf dconf-vergrendelingen van het profiel
+  ansible.builtin.template:
+    src: locks.j2
+    dest: /etc/dconf/db/local.d/locks/50-coolbx-profile
+    owner: root
+    group: root
+    mode: "0644"
+  when: cfg.dconf_locks | default([]) | length > 0
+  notify: Dconf update
+
+- name: Verwijder dconf-vergrendelingen als het profiel er geen heeft
+  ansible.builtin.file:
+    path: /etc/dconf/db/local.d/locks/50-coolbx-profile
+    state: absent
+  when: cfg.dconf_locks | default([]) | length == 0
+  notify: Dconf update

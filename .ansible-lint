@@ -1,0 +1,16 @@
+---
+# Mild: productie-profiel zonder de strengste naam-/meta-regels (rollen zijn intern, geen Galaxy).
+profile: moderate
+exclude_paths:
+  - .git/
+  - vault.yml
+  - .github/
+skip_list:
+  - role-name          # rolnamen met streepje (kiosk-apps, google-login) zijn hier bewust
+  - galaxy             # geen Galaxy-metadata nodig
+  - var-naming[no-role-prefix]
+  - name[casing]       # Nederlandse taaknamen
+  - yaml[line-length]
+warn_list:
+  - no-changed-when
+  - risky-file-permissions

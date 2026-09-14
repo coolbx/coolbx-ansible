@@ -1,0 +1,25 @@
+---
+# SJABLOON van vault.yml — plaintext, alleen placeholders. De echte vault.yml wordt gebouwd door
+# scripts/make-vault.sh en is ansible-vault-versleuteld. Zet NOOIT echte geheimen in dit bestand:
+# de repo is publiek.
+
+# Google Secure LDAP — toegangsgegevens van de LDAP-client (Google Admin → Apps → LDAP).
+google_ldap_user: "PLACEHOLDER-ldap-gebruikersnaam"
+google_ldap_password: "PLACEHOLDER-ldap-wachtwoord"
+
+# Google Secure LDAP — clientcertificaat + sleutel (PEM, meerregelig).
+google_ldap_cert: |
+  -----BEGIN CERTIFICATE-----
+  PLACEHOLDER
+  -----END CERTIFICATE-----
+google_ldap_key: |
+  -----BEGIN PRIVATE KEY-----
+  PLACEHOLDER
+  -----END PRIVATE KEY-----
+
+# Chrome Enterprise Core — inschrijvingstoken van de OU (Google Admin → Chrome-browser → Beheerde browsers).
+chrome_enrollment_token: "PLACEHOLDER-enrollment-token"
+
+# Optioneel: wachtwoord-hash (sha512-crypt, `openssl passwd -6`) voor de beheerder `coolbx`.
+# Weglaten = de rol admin-user doet niets.
+# admin_password_hash: "$6$PLACEHOLDER"

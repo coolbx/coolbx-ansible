@@ -1,7 +1,0 @@
-# Taken voor leerkrachten laptops
-- name: Installeer VSCodium (user)
-  community.general.flatpak:
-    name: com.vscodium.codium
-    state: present
-    method: user
-    remote: flathub

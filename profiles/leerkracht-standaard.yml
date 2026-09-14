@@ -1,0 +1,14 @@
+---
+# Standaardprofiel voor leerkracht-toestellen (rol "leerkracht"). Ligt bovenop profiles/basis.yml.
+
+google_login:
+  domain: edugolo.be
+  search_bases:
+    - dc=edugolo,dc=be
+    - dc=lln,dc=edugolo,dc=be
+  group_base: ou=Groups,dc=edugolo,dc=be
+  allow_groups:
+    - coolbx-test-personeel
+
+flatpaks:
+  - org.libreoffice.LibreOffice

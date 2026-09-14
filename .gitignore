@@ -1,0 +1,11 @@
+# Vault-wachtwoord en losse geheimen: NOOIT in git.
+vault-pass
+*.vault-pass
+secrets/
+*.retry
+*.pem
+*.key
+*.crt
+# lokale ansible-rommel
+.ansible/
+__pycache__/

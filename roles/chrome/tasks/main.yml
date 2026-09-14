@@ -1,0 +1,51 @@
+---
+# Chrome Enterprise Core-token (vault) + toestelbeleid uit het profiel (ADR-0033).
+# /etc/opt/chrome/policies/managed is in het image een symlink naar /etc/chromium/policies/managed,
+# dus één JSON dekt Chrome én Chromium.
+
+- name: Map voor het enrollment-token
+  ansible.builtin.file:
+    path: /etc/opt/chrome/policies/enrollment
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: chrome_enrollment_token is defined
+
+- name: Schrijf het Chrome Enterprise Core enrollment-token
+  ansible.builtin.copy:
+    dest: /etc/opt/chrome/policies/enrollment/CloudManagementEnrollmentToken
+    content: "{{ chrome_enrollment_token | trim }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: chrome_enrollment_token is defined
+  no_log: true
+
+- name: Melding als er geen enrollment-token in de vault zit
+  ansible.builtin.debug:
+    msg: "chrome_enrollment_token niet gedefinieerd (vault niet geladen?) — Chrome wordt niet ingeschreven"
+  when: chrome_enrollment_token is not defined
+
+- name: Map voor browserbeleid
+  ansible.builtin.file:
+    path: /etc/chromium/policies/managed
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Schrijf het toestelbeleid van het profiel
+  ansible.builtin.copy:
+    dest: /etc/chromium/policies/managed/coolbx-profile.json
+    content: "{{ cfg.chrome_policies | to_nice_json(indent=2) }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+  when: cfg.chrome_policies | default({}) | length > 0
+
+- name: Verwijder het toestelbeleid als het profiel er geen heeft
+  ansible.builtin.file:
+    path: /etc/chromium/policies/managed/coolbx-profile.json
+    state: absent
+  when: cfg.chrome_policies | default({}) | length == 0

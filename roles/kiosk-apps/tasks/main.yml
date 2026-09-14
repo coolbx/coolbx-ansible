@@ -1,0 +1,76 @@
+---
+# cfg.kiosk_apps → /etc/coolbx/kiosk-apps.d/<id>.yaml (ADR-0029), daarna `coolbx-kiosk-apps apply`.
+# Bestanden van deze rol dragen een markering; alleen die worden opgeruimd als ze uit de lijst verdwijnen.
+
+- name: Controleer de kiosk-app-definities
+  ansible.builtin.assert:
+    that:
+      - item.id is defined
+      - item.id | string is match('^[a-z0-9][a-z0-9-]{0,31}$')
+      - item.name is defined and (item.name | string | length > 0)
+      - item.url is defined and (item.url | string is match('^https?://'))
+    fail_msg: "kiosk_apps: ongeldige app {{ item }} — id (a-z0-9-), name en url (http/https) zijn verplicht"
+    quiet: true
+  loop: "{{ cfg.kiosk_apps | default([]) }}"
+  loop_control:
+    label: "{{ item.id | default('?') }}"
+
+- name: Map voor kiosk-app-config
+  ansible.builtin.file:
+    path: /etc/coolbx/kiosk-apps.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Schrijf de kiosk-app-bestanden
+  ansible.builtin.copy:
+    dest: "/etc/coolbx/kiosk-apps.d/{{ item.id }}.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by coolbx-ansible (profile {{ coolbx_effective_profile }}) — do not edit by hand.
+      {{ item | dict2items | rejectattr('key', 'equalto', 'id') | items2dict | to_nice_yaml(indent=2) }}
+  loop: "{{ cfg.kiosk_apps | default([]) }}"
+  loop_control:
+    label: "{{ item.id }}"
+  register: kiosk_apps_written
+
+- name: Bestaat de kiosk-app-map al? (in check-modus mogelijk nog niet)
+  ansible.builtin.stat:
+    path: /etc/coolbx/kiosk-apps.d
+  register: kiosk_apps_dir
+
+- name: Zoek verouderde kiosk-app-bestanden van deze rol
+  ansible.builtin.find:
+    paths: /etc/coolbx/kiosk-apps.d
+    patterns: "*.yaml"
+    contains: "^# Managed by coolbx-ansible"
+    excludes: "{{ cfg.kiosk_apps | default([]) | map(attribute='id') | map('regex_replace', '$', '.yaml') | list }}"
+  register: kiosk_apps_stale
+  when: kiosk_apps_dir.stat.isdir | default(false)
+
+- name: Verwijder verouderde kiosk-app-bestanden
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ kiosk_apps_stale.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: kiosk_apps_removed
+
+- name: Is coolbx-kiosk-apps aanwezig?
+  ansible.builtin.stat:
+    path: /usr/bin/coolbx-kiosk-apps
+  register: kiosk_apps_cmd
+
+- name: Launchers bijwerken (coolbx-kiosk-apps apply)
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/coolbx-kiosk-apps
+      - apply
+  when:
+    - kiosk_apps_cmd.stat.exists
+    - kiosk_apps_written is changed or kiosk_apps_removed is changed
+  changed_when: true

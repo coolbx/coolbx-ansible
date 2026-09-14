@@ -1,4 +1,0 @@
-# Taken voor administratie laptops
-- name: (placeholder) Er zijn nog geen specifieke taken
-  ansible.builtin.debug:
-    msg: "Deze laptop is correct geïdentificeerd als 'administratie'."

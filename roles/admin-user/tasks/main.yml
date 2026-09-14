@@ -1,0 +1,32 @@
+---
+# Wachtwoord van de verborgen beheerder `coolbx` (ADR-0031) uit de vault (sha512-crypt-hash).
+# Alleen als admin_password_hash gedefinieerd is én de gebruiker al bestaat (het image maakt hem aan).
+
+- name: Beheerderswachtwoord overslaan (admin_password_hash niet gedefinieerd)
+  ansible.builtin.debug:
+    msg: "admin_password_hash niet in de vault — beheerderswachtwoord blijft ongewijzigd"
+  when: admin_password_hash is not defined
+
+- name: Beheerderswachtwoord zetten
+  when: admin_password_hash is defined
+  block:
+    - name: Bestaat de gebruiker coolbx?
+      ansible.builtin.getent:
+        database: passwd
+        key: coolbx
+        fail_key: false
+
+    - name: Zet wachtwoord-hash en wheel-lidmaatschap van coolbx
+      ansible.builtin.user:
+        name: coolbx
+        password: "{{ admin_password_hash }}"
+        update_password: always
+        groups: wheel
+        append: true
+      when: ansible_facts.getent_passwd.coolbx is not none
+      no_log: true
+
+    - name: Melding als de gebruiker coolbx ontbreekt
+      ansible.builtin.debug:
+        msg: "gebruiker coolbx bestaat niet op dit systeem (geen admin-feature?) — overslaan"
+      when: ansible_facts.getent_passwd.coolbx is none
