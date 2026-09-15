@@ -28,6 +28,8 @@ chrome_policies:
   RestoreOnStartup: 4
   RestoreOnStartupURLs:
     - https://edugolo.smartschool.be/
+  # 1 = aanmelden toegestaan (gedeeld toestel). Leerling/leerkracht overschrijven dit met 2 = verplicht:
+  # Chrome opent dan de Google-aanmelding, waar Google de OTP-wachtwoordwijziging afdwingt.
   BrowserSignin: 1
   PasswordManagerEnabled: false
 

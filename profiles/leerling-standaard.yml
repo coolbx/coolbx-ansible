@@ -14,3 +14,8 @@ google_login:
     - coolbx-test-ict
 
 flatpaks: []
+
+# Chrome: aanmelden met het schoolaccount VERPLICHT (BrowserSignin 2). Zo dwingt Google bij de eerste
+# start de wijziging van het tijdelijke wachtwoord (OTP) af; de laptop-aanmelding zelf doet dat niet (LDAP).
+chrome_policies:
+  BrowserSignin: 2
